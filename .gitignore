@@ -1,0 +1,6 @@
+.env.local
+venv/
+.DS_Store
+credentials.json
+.env
+.env.prod

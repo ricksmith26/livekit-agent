@@ -1,0 +1,13 @@
+livekit-agents>=0.12.11
+livekit-plugins-openai>=0.10.17
+livekit-plugins-cartesia>=0.4.7
+livekit-plugins-deepgram>=0.6.17
+livekit-plugins-silero>=0.7.4
+livekit-plugins-turn-detector>=0.4.0
+python-dotenv~=1.0
+
+# Additional dependencies for imports
+aiohttp>=3.8.5          # Required for async HTTP requests
+requests>=2.28.0        # Required for synchronous HTTP requests
+openai>=1.2.0           # Required for OpenAI API integration
+typing_extensions>=4.5  # Required for Annotated type hinting in some Python versions
