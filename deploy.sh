@@ -2,7 +2,7 @@
 
 # Set variables
 EC2_USER="ec2-user"
-EC2_IP="35.178.145.240"
+EC2_IP="3.9.165.20"
 PEM_KEY="~/.ssh/ai-fhir-server.pem"
 ENV_DIR="/home/ec2-user/livekit-agent"
 APP_DIR="/home/ec2-user/livekit-agent/livekit-agent"  # Replace with your actual agent path

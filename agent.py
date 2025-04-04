@@ -249,6 +249,25 @@ class AssistantFnc(llm.FunctionContext):
         except requests.exceptions.RequestException as e:
             print(e, '<<<<<<<ERROR<<<')
             return {"error": str(e)}
+        
+    @llm.ai_callable()    
+    def getHelpEmergencyCall(self):
+        """
+            Use this to get help for the user
+        """
+        logger.info(f"Calling from : {self.email}<<<<<<<<")
+        url = f"{API_URL}/send-webrtc-message/emergencyCall"
+        headers = {"Content-Type": "application/json"}
+        data = {
+            "toEmail": self.email,
+        }
+        try:
+            response = requests.post(url, json=data, headers=headers)
+            response.raise_for_status()  # Raise an error for bad responses (4xx, 5xx)
+            return json.dumps(response.json())
+        except requests.exceptions.RequestException as e:
+            print(e, '<<<<<<<ERROR<<<')
+            return {"error": str(e)}
 
 
 def prewarm_process(proc: JobProcess):
@@ -269,10 +288,11 @@ async def entrypoint(ctx: JobContext):
             "You can fetch calendar events, tell the time, and give the current date. "
             "You can help a person call someone by using get_personal_contacts and send_web_rtc_contact."
             "When a user asks to call someone, "
-            "you must first call `get_personal_contacts` to find a list of emails. "
-            "Then, immediately call `send_web_rtc_contact` using the correct email from the list. "
+            "you must first call `get_personal_contacts()` to find a list of emails. "
+            "Then, immediately call `send_web_rtc_contact()` using the correct email from the list. "
             "DO NOT wait for the user to say anything after confirming. "
             "You MUST execute both functions automatically and immediately."
+            "If you user asks for help use getHelpEmergencyCall()"
         ),
         role="system",
     )
