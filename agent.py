@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import json
@@ -18,11 +19,12 @@ from livekit.agents import (
     llm,
 )
 from livekit.agents.pipeline import VoicePipelineAgent
-from livekit.plugins import deepgram, openai, silero, turn_detector
+from livekit.plugins import deepgram, openai, silero, turn_detector, elevenlabs
 from livekit import rtc
 from livekit.agents.llm import ChatMessage, ChatImage
 from openai import AsyncOpenAI
 from livekit.agents.llm.chat_context import ChatContext
+# from livekit.plugins.elevenlabs import tts
 
 
 from utils.imageHelpers import get_latest_image, get_latest_image_as_base64
@@ -41,6 +43,12 @@ API_URL=os.getenv("API_URL")
 
 logger = logging.getLogger("voice-assistant")
 logger.setLevel(logging.INFO)
+
+def get_first_name(full_name: str) -> str:
+    """Returns the first name from a full name string."""
+    if not full_name.strip():
+        return ""
+    return full_name.strip().split()[0]
 
 class AssistantFnc(llm.FunctionContext):
     """
@@ -335,7 +343,7 @@ async def entrypoint(ctx: JobContext):
         vad=ctx.proc.userdata["vad"],
         stt=deepgram.STT(),
         llm=openai.LLM(model="gpt-4o"),
-        tts=openai.TTS(voice="fable"), #["alloy", "echo", "fable", "onyx", "nova", "shimmer"] 
+        tts=elevenlabs.TTS(voice="fable"), #["alloy", "echo", "fable", "onyx", "nova", "shimmer"] 
         fnc_ctx=fnc_ctx,
         chat_ctx=initial_chat_ctx,
         max_nested_fnc_calls=5,
@@ -349,8 +357,22 @@ async def entrypoint(ctx: JobContext):
 
     # ✅ Start the assistant
     agent.start(ctx.room, participant)
+    initial_prompt = metadata.get("initialPrompt")
+    logger.info(f"🧠 Metadata received: {metadata}")
 
-    await agent.say("Hello! How can I assist you today?")
+    if initial_prompt:
+        logger.info(f"🧠 Scheduling injection of initial prompt: {initial_prompt}")
+
+        async def inject_prompt_when_ready():
+            while agent._agent_output is None:
+                await asyncio.sleep(0.1)  # Wait until agent is ready
+            logger.info(f"🧠 Injecting initial prompt: {initial_prompt}")
+            agent._transcribed_text = initial_prompt
+            agent._validate_reply_if_possible()
+
+        asyncio.create_task(inject_prompt_when_ready())
+    else:
+        await agent.say(f"Hi {get_first_name(metadata.get("name"))}! How can I help?")
 
 
 if __name__ == "__main__":
