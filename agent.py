@@ -19,12 +19,11 @@ from livekit.agents import (
     llm,
 )
 from livekit.agents.pipeline import VoicePipelineAgent
-from livekit.plugins import deepgram, openai, silero, turn_detector, elevenlabs
+from livekit.plugins import deepgram, openai, silero, turn_detector
 from livekit import rtc
 from livekit.agents.llm import ChatMessage, ChatImage
 from openai import AsyncOpenAI
 from livekit.agents.llm.chat_context import ChatContext
-# from livekit.plugins.elevenlabs import tts
 
 
 from utils.imageHelpers import get_latest_image, get_latest_image_as_base64
@@ -163,6 +162,46 @@ class AssistantFnc(llm.FunctionContext):
         except Exception as e:
             logger.error(f"❌ Unexpected error: {e}")
             return "An unexpected error occurred while retrieving today's events."
+        
+    @llm.ai_callable()
+    async def get_events_for_date(
+        self,
+        date: Annotated[
+            str,
+            llm.TypeInfo(description="The date to fetch events for in YYYY-MM-DD format")
+        ],
+    ):
+        """Fetch events for a specific date from Google Calendar for the authenticated user."""
+        logger.info(f"📅 Fetching events for {date} for {self.email}")
+
+        if not self.email:
+            logger.warning("⚠️ No email provided!")
+            return "I couldn't retrieve your events because I don't have your email."
+
+        URL = f"{API_URL}/calendar/{self.email}/date?date=${date}"
+        logger.info(f"📡 Requesting calendar data from {URL}")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(URL) as response:
+                    logger.info(f"📩 Received response: {response.status}")
+                    if response.status == 200:
+                        events_data = await response.json()
+                        if events_data:
+                            return "\n".join(
+                                f"- {event.get('summary', 'No Title')} at {event.get('start', 'Unknown time')}"
+                                for event in events_data
+                            )
+                        return f"There are no events scheduled for {date}."
+                    else:
+                        logger.error(f"❌ API Error: {response.status}")
+                        return f"I couldn't retrieve events for {date} due to a server issue."
+        except aiohttp.ClientError as e:
+            logger.error(f"❌ Network error: {e}")
+            return f"I couldn't retrieve events for {date} due to a network issue."
+        except Exception as e:
+            logger.error(f"❌ Unexpected error: {e}")
+            return f"An unexpected error occurred while retrieving events for {date}."
 
     @llm.ai_callable()
     def get_time(self):
@@ -276,6 +315,22 @@ class AssistantFnc(llm.FunctionContext):
         except requests.exceptions.RequestException as e:
             print(e, '<<<<<<<ERROR<<<')
             return {"error": str(e)}
+        
+    @llm.ai_callable()
+    def userFinishedSoDisconnect(self):
+        """Use this function when a user is finished and it will disconnect them"""
+        url = f"{API_URL}/modes/"
+        headers = {"Content-Type": "application/json"}
+        data = {
+            "toEmail": self.email,
+            "mode": 'idle'
+        }
+        try:
+            response = requests.post(url, json=data, headers=headers)
+            response.raise_for_status()
+            return json.dumps(response.json())
+        except requests.exceptions.RequestException as e:
+            return {"error": str(e)}
 
 
 def prewarm_process(proc: JobProcess):
@@ -292,7 +347,7 @@ async def entrypoint(ctx: JobContext):
     # ✅ Set up initial assistant behavior
     initial_chat_ctx = llm.ChatContext().append(
         text=(
-            "You are a personal assistant created by LiveKit. Your interface with users is voice. "
+            "You are a personal assistant call Winston, you are here to help in anyway you can."
             "You can fetch calendar events, tell the time, and give the current date. "
             "You can help a person call someone by using get_personal_contacts and send_web_rtc_contact."
             "When a user asks to call someone, "
@@ -343,7 +398,7 @@ async def entrypoint(ctx: JobContext):
         vad=ctx.proc.userdata["vad"],
         stt=deepgram.STT(),
         llm=openai.LLM(model="gpt-4o"),
-        tts=elevenlabs.TTS(voice="fable"), #["alloy", "echo", "fable", "onyx", "nova", "shimmer"] 
+        tts=openai.TTS(voice="fable"), #["alloy", "echo", "fable", "onyx", "nova", "shimmer"] 
         fnc_ctx=fnc_ctx,
         chat_ctx=initial_chat_ctx,
         max_nested_fnc_calls=5,
