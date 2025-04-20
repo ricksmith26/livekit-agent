@@ -296,6 +296,30 @@ class AssistantFnc(llm.FunctionContext):
         except requests.exceptions.RequestException as e:
             print(e, '<<<<<<<ERROR<<<')
             return {"error": str(e)}
+
+    @llm.ai_callable()    
+    def playSomething(self, music_request: Annotated[
+            str, llm.TypeInfo(description="The words the users used to describe what they want to play")
+        ]):
+        """
+            Use this if the user request to play some music or play something
+        """
+        logger.info(f"Calling from : {self.email}<<<<<<<<")
+
+        url = f"{API_URL}/spotify/requestMusic"
+        headers = {"Content-Type": "application/json"}
+        data = {
+            "toEmail": self.email,
+            "request": music_request,
+        }
+        print(music_request, '<<<<MUSIC REQUEST')
+        try:
+            response = requests.post(url, json=data, headers=headers)
+            response.raise_for_status()  # Raise an error for bad responses (4xx, 5xx)
+            return json.dumps(response.json())
+        except requests.exceptions.RequestException as e:
+            print(e, '<<<<<<<playSomething ERROR<<<')
+            return {"error": str(e)}
         
     @llm.ai_callable()    
     def getHelpEmergencyCall(self):
@@ -356,6 +380,7 @@ async def entrypoint(ctx: JobContext):
             "DO NOT wait for the user to say anything after confirming. "
             "You MUST execute both functions automatically and immediately."
             "If you user asks for help use getHelpEmergencyCall()"
+            "You can help with a "
         ),
         role="system",
     )
@@ -427,7 +452,8 @@ async def entrypoint(ctx: JobContext):
 
         asyncio.create_task(inject_prompt_when_ready())
     else:
-        await agent.say(f"Hi {get_first_name(metadata.get("name"))}! How can I help?")
+        # print()
+        await agent.say(f"Hi {get_first_name(metadata.get('name'))}! How can I help?")
 
 
 if __name__ == "__main__":

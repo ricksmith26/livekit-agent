@@ -4,3 +4,4 @@ venv/
 credentials.json
 .env
 .env.prod
+.env.local
